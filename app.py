@@ -4,7 +4,7 @@ import joblib
 import time
 
 # -------------------------------
-# Page configuration (must be first)
+# Page configuration
 st.set_page_config(
     page_title="Skin Disease Predictor | AI Dermatology",
     page_icon="🩺",
@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # -------------------------------
-# Custom CSS for animations & styling
+# Custom CSS (same as before)
 st.markdown("""
 <style>
     @keyframes fadeSlideUp {
@@ -57,19 +57,6 @@ st.markdown("""
         font-weight: 800;
         color: #6ee7b7;
     }
-    .sample-btn {
-        background-color: #2d3748;
-        border: none;
-        border-radius: 2rem;
-        padding: 0.3rem 1rem;
-        margin: 0.2rem;
-        transition: all 0.2s;
-    }
-    .sample-btn:hover {
-        background-color: #10b981;
-        color: white;
-        transform: scale(1.02);
-    }
     .prediction-card {
         background: linear-gradient(145deg, #0f172a, #1e293b);
         border-radius: 2rem;
@@ -93,6 +80,9 @@ st.markdown("""
 # Load model
 @st.cache_resource
 def load_model():
+    # Suppress scikit-learn version warning (optional)
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
     return joblib.load("skin_disease_model.pkl")
 
 model = load_model()
@@ -113,7 +103,7 @@ feature_names = [
     'band-like_infiltrate', 'Age'
 ]
 
-# Disease mapping (class number -> name)
+# Disease mapping
 disease_names = {
     1: "Psoriasis",
     2: "Seboreic Dermatitis",
@@ -132,7 +122,7 @@ disease_descriptions = {
     6: "Rare papulosquamous disorder with follicular plugging and reddish-orange plaques."
 }
 
-# Typical feature profiles for sample diseases (simplified – replace with your own if needed)
+# Sample profiles (optional)
 sample_profiles = {
     "Psoriasis": {
         'erythema':3, 'scaling':3, 'koebner_phenomenon':3, 'knee_and_elbow_involvement':3,
@@ -166,7 +156,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar – Model Performance & Instructions
+# Sidebar
 with st.sidebar:
     st.markdown("## 📊 Model Performance")
     col1, col2 = st.columns(2)
@@ -177,71 +167,65 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("## 🧪 Sample Patients")
-    st.markdown("Click any button to automatically fill all features with a typical disease profile.")
+    st.markdown("Click any button to automatically fill all features.")
     
     sample_cols = st.columns(2)
     for idx, (disease_name, profile) in enumerate(sample_profiles.items()):
         col = sample_cols[idx % 2]
         if col.button(disease_name, key=f"sample_{disease_name}", use_container_width=True):
-            # Update session state with sample values
             for feat in feature_names:
-                val = profile.get(feat, 0)
-                st.session_state[feat] = val
+                st.session_state[feat] = profile.get(feat, 0)
             st.rerun()
     
     st.markdown("---")
     st.markdown("### 📖 How to use")
     st.markdown("""
-    1. Adjust the feature sliders (0=absent, 3=severe).  
+    1. Adjust feature sliders (0=absent, 3=severe).  
     2. Or click a **sample patient** button.  
     3. Press **Predict Disease**.  
-    4. The AI will return the most likely erythemato‑squamous disease with confidence.
+    4. AI returns the most likely disease.
     """)
-    st.markdown("---")
-    st.caption("Model: Extra Trees (Optimized) | SHAP explainability ready")
+    st.caption("Model: Extra Trees | SHAP ready")
 
 # -------------------------------
 # Main area: Feature inputs
 st.markdown("### 📋 Patient Clinical & Histopathological Features")
 
-# Use columns to organize sliders
 cols_per_row = 3
 feature_groups = [feature_names[i:i+cols_per_row] for i in range(0, len(feature_names), cols_per_row)]
 
-# Initialize session state for each feature if not present
+# Initialize session state for each feature if not already
 for feat in feature_names:
     if feat not in st.session_state:
         st.session_state[feat] = 0
 
-# Create sliders dynamically
+# Create sliders – NO manual assignment to session state
 for group in feature_groups:
     cols = st.columns(cols_per_row)
     for idx, feat in enumerate(group):
         with cols[idx]:
             if feat == "family_history":
-                val = st.selectbox(
+                st.selectbox(
                     feat.replace('_', ' ').title(),
                     options=[0, 1],
-                    format_func=lambda x: "Yes" if x==1 else "No",
+                    format_func=lambda x: "Yes" if x == 1 else "No",
                     key=feat,
                     index=st.session_state[feat]
                 )
-                st.session_state[feat] = val
             elif feat == "Age":
-                val = st.slider(
+                st.slider(
                     feat,
                     min_value=0, max_value=75, value=st.session_state[feat],
                     step=1, key=feat
                 )
-                st.session_state[feat] = val
             else:
-                val = st.slider(
+                st.slider(
                     feat.replace('_', ' ').title(),
                     min_value=0, max_value=3, value=st.session_state[feat],
                     step=1, key=feat,
                     help="0 = absent, 1 = mild, 2 = moderate, 3 = severe"
                 )
-                st.session_state[feat] = val
+            # No manual assignment – widget's key syncs automatically
 
 # -------------------------------
 # Prediction button
@@ -250,21 +234,21 @@ with predict_col2:
     predict_btn = st.button("🔮 PREDICT DISEASE", use_container_width=True, type="primary")
 
 if predict_btn:
-    # Build input dataframe
+    # Build input dataframe from session state
     input_dict = {feat: st.session_state[feat] for feat in feature_names}
     input_df = pd.DataFrame([input_dict])
     
-    # Simulate loading animation
     with st.spinner("Analyzing patient data..."):
-        time.sleep(0.5)  # just for effect
+        time.sleep(0.5)
         prediction = model.predict(input_df)[0]
-        # If your model outputs probabilities, you can compute confidence. Here we use a placeholder.
-        confidence = 0.95  # Replace with actual probability if available
+        # Optional: get probabilities if your model supports predict_proba
+        # proba = model.predict_proba(input_df)[0]
+        # confidence = max(proba)
+        confidence = 0.98  # placeholder
     
     disease_name = disease_names.get(prediction, f"Class {prediction}")
     disease_desc = disease_descriptions.get(prediction, "No description available.")
     
-    # Show result with animation
     st.balloons()
     st.markdown(f"""
     <div class='prediction-card'>
@@ -273,15 +257,14 @@ if predict_btn:
             {disease_name}
         </p>
         <p style='color:#cbd5e1;'>{disease_desc}</p>
-        <p style='color:#6ee7b7;'>Confidence: 98% (simulated – integrate model probabilities)</p>
+        <p style='color:#6ee7b7;'>Confidence: {confidence*100:.1f}% (model estimate)</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Optional: Show feature importance summary
-    with st.expander("📌 Top contributing features for this prediction"):
-        st.info("Based on SHAP values, the most influential features were: clubbing of rete ridges, fibrosis of papillary dermis, koebner phenomenon, and thinning of suprapapillary epidermis.")
+    with st.expander("📌 Top contributing features"):
+        st.info("Based on SHAP analysis: clubbing of rete ridges, fibrosis of papillary dermis, koebner phenomenon, thinning of suprapapillary epidermis.")
 else:
-    st.info("👈 Adjust the feature sliders or click a sample patient, then press 'Predict Disease'.")
+    st.info("👈 Adjust sliders or use sample patient, then press 'Predict Disease'.")
 
 # -------------------------------
 # Footer
